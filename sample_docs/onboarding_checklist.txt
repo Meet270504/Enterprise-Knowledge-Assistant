@@ -1,0 +1,25 @@
+Contoso North — New Hire Onboarding Checklist
+Document ID: HR-ONB-2024-05
+Department: Human Resources
+Category: Onboarding
+Classification: Fictional sample for portfolio demo
+
+Day 1
+- Collect laptop and badge from IT at the lobby desk or via remote shipment tracking link
+- Complete security awareness training module (required before production system access)
+- Set up MFA on email and VPN
+- Meet your manager for role expectations and 30/60/90 goals
+
+Week 1
+- Join the weekly team standup calendar invite
+- Read the Information Security Policy and Remote Work Policy
+- Confirm emergency contact and direct deposit in the HR portal
+- Shadow one customer or internal meeting with your onboarding buddy
+
+First 30 Days
+- Complete role-specific training path assigned in Learning Hub
+- Submit first weekly status note to your manager
+- If remote-eligible, submit home office stipend request with receipts up to $400
+
+Notes
+Managers must schedule a 30-day check-in. Access to Confidential data systems is granted only after security training is marked complete.

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enterprise Knowledge Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+    <div class="noise"></div>
+  </div>
+
+  <div class="shell">
+    <aside class="rail" id="rail">
+      <div class="rail-brand">
+        <div class="logo" aria-hidden="true">
+          <span class="logo-core"></span>
+        </div>
+        <div>
+          <p class="logo-word">EKA</p>
+          <p class="logo-tag">Knowledge Assistant</p>
+        </div>
+      </div>
+
+      <button type="button" class="btn new-chat" id="newChatBtn">+ New chat</button>
+
+      <div class="rail-block chats-block">
+        <div class="rail-head">
+          <h2>Chats</h2>
+          <span id="chatCount" class="count">0</span>
+        </div>
+        <ul id="chatList" class="chat-list"></ul>
+        <p id="chatEmpty" class="empty-hint">No chats yet — ask a question to start.</p>
+      </div>
+
+      <div class="rail-block">
+        <div class="rail-head">
+          <h2>Library</h2>
+          <span id="docCount" class="count">0</span>
+        </div>
+        <ul id="docList" class="doc-list"></ul>
+        <p id="docEmpty" class="empty-hint" hidden>No documents indexed yet.</p>
+      </div>
+
+      <div class="rail-block upload-block" id="uploadPanel">
+        <h2>Index a file</h2>
+        <p class="hint">PDF, DOCX, TXT, Markdown, CSV</p>
+        <form id="uploadForm" class="upload-form">
+          <label class="drop" id="dropZone">
+            <input id="fileInput" type="file" accept=".pdf,.docx,.txt,.md,.markdown,.csv" required />
+            <span class="drop-title">Drop or browse</span>
+            <span class="drop-file" id="dropFileName">No file selected</span>
+          </label>
+          <div class="twin">
+            <label>
+              <span>Department</span>
+              <input id="uploadDepartment" type="text" value="General" maxlength="128" />
+            </label>
+            <label>
+              <span>Category</span>
+              <input id="uploadCategory" type="text" value="Policy" maxlength="128" />
+            </label>
+          </div>
+          <button type="submit" class="btn solid" id="uploadBtn">Upload &amp; index</button>
+          <p id="uploadStatus" class="status" role="status"></p>
+        </form>
+        <p id="uploadDisabled" class="hint" hidden>
+          Public demo: uploads and deletes are locked. Fictional samples only.
+        </p>
+      </div>
+
+      <div class="rail-foot">
+        <span id="modeBadge" class="mode-badge" data-mode="local_demo">Local demo</span>
+        <a href="/docs" target="_blank" rel="noopener">API</a>
+      </div>
+    </aside>
+
+    <div class="stage">
+      <header class="stage-top">
+        <button type="button" class="icon-btn" id="railToggle" aria-label="Toggle library">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="stage-brand">
+          <h1>Enterprise Knowledge Assistant</h1>
+          <p>Grounded answers from your documents — with visible sources.</p>
+        </div>
+        <div class="filters-inline">
+          <select id="departmentFilter" aria-label="Department filter">
+            <option value="">All departments</option>
+            <option>Human Resources</option>
+            <option>Security</option>
+            <option>Finance</option>
+            <option>General</option>
+          </select>
+          <select id="categoryFilter" aria-label="Category filter">
+            <option value="">All categories</option>
+            <option>Benefits</option>
+            <option>Security</option>
+            <option>Workplace</option>
+            <option>Expenses</option>
+            <option>Onboarding</option>
+            <option>Policy</option>
+          </select>
+        </div>
+      </header>
+
+      <main class="chat" id="chatMain">
+        <section id="emptyState" class="hero">
+          <p class="eyebrow">Ask anything in the knowledge base</p>
+          <h2 class="hero-title">
+            Answers that cite<br />what they stand on.
+          </h2>
+          <p class="hero-copy">
+            Each question opens its own chat so you can review earlier answers anytime from the sidebar.
+          </p>
+          <div class="examples" id="examples">
+            <button type="button" data-q="How many PTO days do employees accrue in their first two years?">
+              <span class="ex-k">PTO</span>
+              <span>First-year accrual policy</span>
+            </button>
+            <button type="button" data-q="Is MFA required for VPN access?">
+              <span class="ex-k">Security</span>
+              <span>MFA on VPN access</span>
+            </button>
+            <button type="button" data-q="What is the daily meal allowance for domestic travel?">
+              <span class="ex-k">Travel</span>
+              <span>Domestic meal allowance</span>
+            </button>
+            <button type="button" data-q="What are core collaboration hours for remote employees?">
+              <span class="ex-k">Remote</span>
+              <span>Core collaboration hours</span>
+            </button>
+          </div>
+        </section>
+
+        <section id="threadRegion" class="thread" hidden></section>
+
+        <div id="thinking" class="thinking" hidden aria-live="polite">
+          <div class="thinking-card">
+            <div class="thinking-top">
+              <span class="spinner" aria-hidden="true"></span>
+              <strong>Working on your question</strong>
+            </div>
+            <ol class="thinking-steps">
+              <li>Searching indexed document chunks</li>
+              <li>Ranking passages by relevance</li>
+              <li>Building a source-grounded answer</li>
+            </ol>
+          </div>
+        </div>
+      </main>
+
+      <footer class="composer-wrap">
+        <form id="queryForm" class="composer">
+          <textarea
+            id="question"
+            rows="1"
+            required
+            placeholder="Ask a question about your indexed documents…"
+          ></textarea>
+          <button type="submit" class="send" id="askBtn" aria-label="Ask">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4 3.3 10l11.2 2-11.2 2z"/>
+            </svg>
+          </button>
+        </form>
+        <p class="disclaimer" id="disclaimer">
+          Do not rely on AI answers without checking sources. Single-tenant portfolio demo — not for confidential enterprise data.
+        </p>
+      </footer>
+    </div>
+  </div>
+
+  <div class="rail-backdrop" id="railBackdrop" hidden></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

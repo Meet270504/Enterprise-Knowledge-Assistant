@@ -1,0 +1,32 @@
+# Optional Render Blueprint for a public demo.
+# Create a pgvector-enabled Postgres on Render (or external), then:
+#   1. Set DATABASE_URL to the asyncpg URL (postgresql+asyncpg://...)
+#   2. Set DEMO_MODE=true, PUBLIC_DEMO=true, SEED_DEMO_DOCUMENTS=true for recruiter demos
+#   3. Leave OPENAI_API_KEY empty for local demo mode, or set it with DEMO_MODE=false for OpenAI mode
+#
+# Never commit real secrets. Configure them in the Render dashboard.
+
+services:
+  - type: web
+    name: enterprise-knowledge-assistant
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        generateValue: false
+        value: "8000"
+      - key: DEMO_MODE
+        value: "true"
+      - key: SEED_DEMO_DOCUMENTS
+        value: "true"
+      - key: PUBLIC_DEMO
+        value: "true"
+      - key: OPENAI_CHAT_MODEL
+        value: "gpt-4o-mini"
+      - key: OPENAI_EMBEDDING_MODEL
+        value: "text-embedding-3-small"
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
