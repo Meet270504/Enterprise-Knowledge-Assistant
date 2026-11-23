@@ -1,42 +1,42 @@
-# Enterprise Generative AI Knowledge Assistant
+# Enterprise Knowledge Assistant
 
-Portfolio document Q&A app: upload company documents, ask natural-language questions, and get answers grounded in retrieved passages with visible citations.
+Document Q&A over your own files: upload policies or notes, ask questions in plain language, and get answers grounded in retrieved passages with visible citations.
 
-**Stack:** Python 3.12 · FastAPI · LangChain · OpenAI (configurable) · PostgreSQL · pgvector
+**Live demo:** [https://enterprise-knowledge-assistant-43nr.onrender.com](https://enterprise-knowledge-assistant-43nr.onrender.com)
 
-> **Scope:** This is a **single-tenant portfolio demo**. It has no sign-in, role-based access control, or tenant isolation. **Do not use it with confidential enterprise data**, and do not treat AI answers as authoritative without checking the cited sources.
+**Stack:** Python 3.12 · FastAPI · LangChain · OpenAI · PostgreSQL · pgvector
+
+> Single-tenant demo — no sign-in, RBAC, or tenant isolation. Do not load confidential data. Always check cited sources before trusting an answer.
 
 ---
 
 ## Features
 
-- Upload PDF, DOCX, TXT, Markdown, and CSV; validate type/size; extract text; chunk with overlap; embed; store in PostgreSQL/pgvector
-- Document processing status, chunk counts, and error messages (including guidance that scanned PDFs need OCR)
-- RAG query with optional department/category filters, relevance threshold, citation validation
-- Embedding isolation by `embedding_provider` + `embedding_model` (OpenAI vectors are never mixed with local demo vectors)
-- **Local demo mode** (no OpenAI key): fictional sample policies, deterministic retrieval, evidence excerpts (not fake GPT answers)
-- Same-origin responsive browser UI + OpenAPI docs at `/docs`
-- Docker Compose for API + pgvector Postgres
-- `PUBLIC_DEMO` flag to disable anonymous uploads/deletes
+- Upload PDF, DOCX, TXT, Markdown, and CSV with type/size checks, text extraction, overlapping chunks, embeddings, and pgvector storage
+- Document status, chunk counts, and clear errors (including when scanned PDFs need OCR)
+- RAG queries with optional department/category filters, relevance threshold, and citation validation
+- Embedding isolation by provider + model (OpenAI and local vectors are never mixed)
+- **OpenAI mode** for grounded chat answers, or **local demo mode** (no API key) with deterministic retrieval
+- Optional Ollama path in local mode for grounded answers without OpenAI
+- Browser UI + OpenAPI at `/docs`
+- Docker Compose for API + Postgres
+- `PUBLIC_DEMO` to lock uploads/deletes on shared hosts
+- Per-IP and daily query limits to control OpenAI spend on public deployments
 
 ---
 
 ## Quick start (Docker Compose)
 
-Requires Docker Desktop (or another Docker engine).
-
 ```bash
 cp .env.example .env
-# Optional: set OPENAI_API_KEY and DEMO_MODE=false for OpenAI mode
+# Optional: OPENAI_API_KEY=... and DEMO_MODE=false
 docker compose up --build
 ```
 
-Open:
-
 - UI: [http://127.0.0.1:8000](http://127.0.0.1:8000)
-- API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- API: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-Default Compose credentials are local-only (`eka` / `eka_secret`). Change them for any shared host.
+Default Compose DB credentials (`eka` / `eka_secret`) are for local use only — change them on any shared host.
 
 ---
 
@@ -44,13 +44,11 @@ Default Compose credentials are local-only (`eka` / `eka_secret`). Change them f
 
 ### 1. PostgreSQL with pgvector
 
-You need a Postgres instance with the `vector` extension. Easiest path:
-
 ```bash
 docker compose up -d db
 ```
 
-Or install Postgres + [pgvector](https://github.com/pgvector/pgvector) yourself and create a database/user matching `DATABASE_URL`.
+Or run your own Postgres with [pgvector](https://github.com/pgvector/pgvector) and point `DATABASE_URL` at it.
 
 ### 2. Python environment
 
@@ -61,53 +59,43 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-### 3. Run the API
+### 3. Run
 
 ```bash
-source .venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
+# or: python -m app.main
 ```
-
-Or:
-
-```bash
-python -m app.main
-```
-
-The app respects the platform `PORT` environment variable.
 
 ---
 
 ## Configuration
 
-See `.env.example`. Important variables:
+See `.env.example`.
 
 | Variable | Purpose |
 |---|---|
-| `OPENAI_API_KEY` | Enables OpenAI embeddings + chat when demo mode is off |
-| `OPENAI_CHAT_MODEL` | Default `gpt-4o-mini` (set `gpt-4o` to upgrade) |
+| `OPENAI_API_KEY` | OpenAI embeddings + chat when demo mode is off |
+| `OPENAI_CHAT_MODEL` | Default `gpt-4o-mini` |
 | `OPENAI_EMBEDDING_MODEL` | Default `text-embedding-3-small` |
-| `DEMO_MODE` | `true` → local deterministic retrieval + evidence answers |
-| `SEED_DEMO_DOCUMENTS` | Seed fictional PTO/security/remote/travel/onboarding docs |
-| `PUBLIC_DEMO` | Disable uploads & deletes; fictional docs only |
-| `DATABASE_URL` | Async SQLAlchemy URL (`postgresql+asyncpg://…`) |
-| `QUERY_RATE_LIMIT_PER_IP` | Max `/api/query` calls per IP per hour (`0` = off; default `8`) |
-| `QUERY_DAILY_GLOBAL_LIMIT` | Max queries per UTC day site-wide (`0` = off; default `40`) |
+| `DEMO_MODE` | `true` → local retrieval (no OpenAI chat) |
+| `SEED_DEMO_DOCUMENTS` | Seed fictional Contoso North sample policies |
+| `PUBLIC_DEMO` | Disable uploads and deletes |
+| `DATABASE_URL` | `postgresql+asyncpg://…` |
+| `QUERY_RATE_LIMIT_PER_IP` | Max queries per IP per hour (`0` = off; default `8`) |
+| `QUERY_DAILY_GLOBAL_LIMIT` | Max queries per UTC day (`0` = off; default `40`) |
 | `MAX_UPLOAD_BYTES` | Upload size limit (default 10 MB) |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | Chunking |
 | `TOP_K` / `RELEVANCE_THRESHOLD` | Retrieval |
 
-### Enable OpenAI mode
+### OpenAI mode
 
-1. Put a real key in `.env`: `OPENAI_API_KEY=sk-...`
-2. Set `DEMO_MODE=false`
-3. Optionally set `OPENAI_CHAT_MODEL=gpt-4o`
-4. Restart the app
-5. Re-upload or re-seed documents **in OpenAI mode** so chunks are embedded with the OpenAI model (retrieval never mixes providers/models)
+1. Set `OPENAI_API_KEY` and `DEMO_MODE=false`
+2. Restart
+3. Re-seed or re-upload under OpenAI mode so embeddings match the active provider
 
-### Local demo mode (no key)
+### Local demo mode
 
-Leave `OPENAI_API_KEY` empty and/or `DEMO_MODE=true`. The UI badge shows **Local demo mode**. Answers list matching excerpts with similarity scores instead of calling GPT.
+Leave the key empty and/or set `DEMO_MODE=true`. The UI shows a Local badge. Answers use retrieved excerpts (and Ollama when configured), not OpenAI chat.
 
 ---
 
@@ -117,14 +105,10 @@ Leave `OPENAI_API_KEY` empty and/or `DEMO_MODE=true`. The UI badge shows **Local
 |---|---|---|
 | `GET` | `/api/health` | Liveness + mode + DB check |
 | `GET` | `/api/config` | Non-secret runtime config for the UI |
-| `GET` | `/api/documents` | List documents + status |
+| `GET` | `/api/documents` | List documents |
 | `POST` | `/api/documents` | Multipart upload (`file`, `department`, `category`) |
 | `DELETE` | `/api/documents/{id}` | Delete document + chunks |
-| `POST` | `/api/query` | JSON `{question, department?, category?, top_k?}` |
-
-Interactive docs: `/docs`.
-
-### Example query
+| `POST` | `/api/query` | `{question, department?, category?, top_k?}` |
 
 ```bash
 curl -s http://127.0.0.1:8000/api/query \
@@ -136,13 +120,11 @@ curl -s http://127.0.0.1:8000/api/query \
 
 ## Retrieval evaluation
 
-With the server running and samples seeded:
-
 ```bash
 python scripts/evaluate_retrieval.py --base-url http://127.0.0.1:8000
 ```
 
-Representative questions expect hits on the fictional PTO, security, travel, remote-work, and onboarding samples, plus an abstention case.
+Covers sample PTO, security, travel, remote-work, and onboarding questions, plus an abstention case.
 
 ---
 
@@ -152,16 +134,16 @@ Representative questions expect hits on the fictional PTO, security, travel, rem
 app/
   main.py              # FastAPI app + static UI
   config.py            # Settings from env
-  database.py          # Async SQLAlchemy + pgvector bootstrap
-  models.py            # Document / Chunk tables
-  schemas.py           # Request/response models
+  database.py          # Async SQLAlchemy + pgvector
+  models.py / schemas.py
   api/routes/          # health, documents, query
-  services/            # extraction, chunking, embeddings, ingestion, rag, demo seed
+  services/            # extraction, chunking, embeddings, ingestion, rag, limits
   static/              # Browser UI
 sample_docs/           # Fictional Contoso North policies
 scripts/evaluate_retrieval.py
 Dockerfile
 docker-compose.yml
+render.yaml
 .env.example
 ```
 
@@ -170,40 +152,36 @@ docker-compose.yml
 ## Security notes
 
 - Secrets stay in environment variables; `.env` is gitignored
-- Upload validation: extension allow-list, size limit, sanitized filenames, no path traversal
+- Upload validation: extension allow-list, size limit, sanitized filenames
 - API keys are never sent to the browser
-- Citation markers from the model are validated against retrieved sources; fabricated `[S#]` markers are stripped
-- Prompt instructs the model to treat document text as untrusted reference material
-- **Not production-hardened for multi-user confidential data**
+- Model citation markers are checked against retrieved sources; fabricated markers are stripped
+- Document text is treated as untrusted reference material in the prompt
+- Not hardened for multi-user confidential workloads
 
 ---
 
-## Deployment (Render + Neon, OpenAI recruiter demo)
+## Deployment
 
-Cheap path: **Render** free web (Docker) + **Neon** free Postgres. Recruiters see real **OpenAI** answers; uploads stay locked and query caps limit spend.
+The included setup targets **Render** (Docker web service) and **Neon** (Postgres + pgvector). Other Docker hosts work the same way: provide `DATABASE_URL`, set mode flags, and inject secrets in the platform — never in git.
 
-### 1. Protect OpenAI spend (do this first)
+### OpenAI cost controls on a public URL
 
-1. Open [OpenAI usage limits](https://platform.openai.com/settings/organization/limits)
-2. Set a low **monthly budget / hard limit** (e.g. **$5–10**) and an email alert
-3. Prefer a key used only for this demo
+1. Set a monthly budget / hard limit in the [OpenAI usage settings](https://platform.openai.com/settings/organization/limits)
+2. Use `PUBLIC_DEMO=true` so anonymous users cannot upload large files
+3. Keep `QUERY_RATE_LIMIT_PER_IP` and `QUERY_DAILY_GLOBAL_LIMIT` enabled (defaults: 8/hour, 40/day)
+4. Prefer `gpt-4o-mini` and a modest `TOP_K` (e.g. `3`)
 
-### 2. Neon Postgres + pgvector
+### Neon
 
-1. Create a free project at [neon.tech](https://neon.tech)
-2. Copy the connection string (`postgresql://…`)
-3. Rewrite the scheme to SQLAlchemy async:
-   - `postgresql://` → `postgresql+asyncpg://`
-   - Keep `?ssl=require` (or Neon’s SSL query params)
-4. In the Neon SQL editor (optional check): `CREATE EXTENSION IF NOT EXISTS vector;`  
-   The app also runs this on startup.
+1. Create a project and copy the connection string
+2. Use `postgresql+asyncpg://…` and `ssl=require` (drop `channel_binding` if the driver rejects it)
+3. The app runs `CREATE EXTENSION IF NOT EXISTS vector` on startup
 
-### 3. Render web service
+### Render
 
-1. [Render](https://render.com) → **New** → **Web Service** → connect this GitHub repo
-2. Runtime: **Docker** (uses the repo `Dockerfile`). Free plan is fine; expect a **cold start** after idle
-3. Health check path: `/api/health`
-4. Set environment variables (Blueprint defaults live in `render.yaml`):
+1. New **Web Service** from this repo, runtime **Docker**, health check `/api/health`
+2. Dockerfile path: `Dockerfile`
+3. Environment (see also `render.yaml`):
 
 ```env
 DEMO_MODE=false
@@ -218,22 +196,9 @@ DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST/DB?ssl=require
 OPENAI_API_KEY=sk-...
 ```
 
-`DEMO_MODE` **must** be `false` and `OPENAI_API_KEY` set, or the UI stays in local demo mode.  
-`PUBLIC_DEMO=true` blocks anonymous uploads/deletes so strangers cannot burn embeddings on large files.
+Free Render instances sleep when idle; the first request after idle may take 30–60 seconds.
 
-### 4. Verify
-
-1. Open the Render URL — badge should show **OpenAI · gpt-4o-mini**, not Local
-2. Library should list the seeded Contoso North sample docs
-3. Ask: `Is MFA required for VPN access?` — expect a cited OpenAI answer
-4. Upload should be disabled
-5. Excess questions return **429** with a demo-budget message (raise `QUERY_*` temporarily on interview day)
-
-Never commit or paste your OpenAI key into the README, screenshots, or client-side code.
-
-### Zero-cost local-demo host (no OpenAI)
-
-If you only want evidence excerpts without a key: `DEMO_MODE=true`, leave `OPENAI_API_KEY` empty, keep `PUBLIC_DEMO=true`.
+For a no-key public host: `DEMO_MODE=true`, empty `OPENAI_API_KEY`, `PUBLIC_DEMO=true`.
 
 ---
 
@@ -241,19 +206,17 @@ If you only want evidence excerpts without a key: `DEMO_MODE=true`, leave `OPENA
 
 | Symptom | Fix |
 |---|---|
-| `connection refused` to Postgres | Start DB (`docker compose up -d db`) and check `DATABASE_URL` |
-| `type "vector" does not exist` | Enable pgvector / use `pgvector/pgvector` image |
-| Empty PDF text | Scanned PDFs need OCR before upload; this app extracts digital text only |
-| Demo answers look “non-GPT” | Expected in local demo mode — enable OpenAI mode for model answers |
-| No results after switching modes | Embeddings are isolated; re-seed/re-upload under the active provider/model |
-| Uploads return 403 | `PUBLIC_DEMO=true` disables uploads/deletes |
-| Query returns 429 | Per-IP or daily demo budget hit — wait, or raise `QUERY_RATE_LIMIT_PER_IP` / `QUERY_DAILY_GLOBAL_LIMIT` |
-| Badge still says Local on Render | Set `DEMO_MODE=false` **and** a non-empty `OPENAI_API_KEY` |
-| `type "vector" does not exist` on Neon | Run `CREATE EXTENSION vector` (or use a Neon image/role that allows it) |
-| Port already in use | Set `PORT=8001` (or another free port) |
+| `connection refused` to Postgres | Start DB / check `DATABASE_URL` |
+| `type "vector" does not exist` | Enable pgvector (`CREATE EXTENSION vector`) |
+| Empty PDF text | Scanned PDFs need OCR; this app reads digital text only |
+| Local-style answers with a key set | Set `DEMO_MODE=false` and restart |
+| No hits after switching modes | Re-seed or re-upload under the active embedding provider |
+| Uploads return 403 | Expected when `PUBLIC_DEMO=true` |
+| Query returns 429 | Rate or daily limit hit — wait or raise `QUERY_*` |
+| Port in use | Set `PORT=8001` (or another free port) |
 
 ---
 
 ## License / attribution
 
-Portfolio project for demonstration. Sample “Contoso North” policies are fictional.
+Demonstration project. Sample “Contoso North” policies are fictional.
