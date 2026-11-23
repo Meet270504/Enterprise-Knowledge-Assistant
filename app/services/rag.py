@@ -40,7 +40,9 @@ async def answer_question(
         )
 
     embedder = get_embedding_provider(cfg)
-    query_vector = await embedder.embed_query(q)
+    # Expand colloquial queries so local hash retrieval hits the right policy lines.
+    retrieval_query = _expand_query_for_retrieval(q)
+    query_vector = await embedder.embed_query(retrieval_query)
     k = top_k or cfg.top_k
 
     rows = await _retrieve_chunks(
@@ -50,7 +52,7 @@ async def answer_question(
         model=embedder.model,
         department=department,
         category=category,
-        top_k=k,
+        top_k=max(k, 8) if cfg.effective_demo_mode else k,
     )
 
     sources: list[SourcePassage] = []
@@ -98,18 +100,34 @@ async def answer_question(
         )
 
     if cfg.effective_demo_mode:
+        from app.services.local_llm import ollama_rag_answer
+
+        local_answer = await ollama_rag_answer(q, sources, cfg)
+        if local_answer:
+            cleaned, used = _validate_citations(local_answer, sources)
+            return QueryResponse(
+                answer=cleaned,
+                abstained=False,
+                retrieval_mode="local_demo",
+                question=q,
+                sources=sources[:k],
+                citations_used=used,
+                filters=filters,
+                message=f"Answered with local model ({cfg.local_llm_model}).",
+            )
+
         answer, used = _demo_evidence_answer(q, sources)
         return QueryResponse(
             answer=answer,
             abstained=False,
             retrieval_mode="local_demo",
             question=q,
-            sources=sources,
+            sources=sources[:k],
             citations_used=used,
             filters=filters,
             message=(
-                "Local demo mode: deterministic retrieval with evidence excerpts "
-                "(not an OpenAI-generated answer)."
+                "Local model unavailable — used extractive evidence fallback. "
+                "Start Ollama (phi3:mini) for better demo answers."
             ),
         )
 
@@ -156,41 +174,60 @@ async def _retrieve_chunks(
     return [(row[0], float(row[1])) for row in result.all()]
 
 
+def _expand_query_for_retrieval(question: str) -> str:
+    """Add intent synonyms so hash embeddings retrieve the right policy chunks."""
+    q = question.lower()
+    extras: list[str] = []
+    if re.search(r"\b(leak|leaked|breach|stolen|exposed|lost)\b", q):
+        extras.extend(
+            ["data loss", "incident reporting", "report security", "within 1 hour"]
+        )
+    if re.search(r"\b(what happens|what do i do|if .+ happens|procedure|report)\b", q):
+        extras.extend(["incident", "notify", "report to", "required"])
+    if re.search(r"\b(mfa|multi[- ]?factor|vpn)\b", q):
+        extras.extend(["multi-factor authentication", "VPN", "required"])
+    if re.search(r"\b(pto|time off|accrue|vacation)\b", q):
+        extras.extend(["accrual rates", "days per calendar year", "PTO"])
+    if re.search(r"\b(meal|allowance|travel|expense)\b", q):
+        extras.extend(["daily meal allowance", "domestically", "reimbursable"])
+    if re.search(r"\b(remote|hybrid|core hours|collaboration)\b", q):
+        extras.extend(["core collaboration hours", "reachable", "time zone"])
+    if not extras:
+        return question
+    return f"{question}\n" + " ".join(extras)
+
+
 def _demo_evidence_answer(question: str, sources: list[SourcePassage]) -> tuple[str, list[str]]:
-    """Build a short, scannable finding from top evidence (not a GPT answer)."""
+    """Extractive fallback when no local/OpenAI chat model is available."""
     used = [src.citation_marker for src in sources]
-    # Choose the most answer-like line across the top few retrieved chunks.
     best_src = sources[0]
     best_snippet = _best_evidence_snippet(question, best_src.content)
     best_score = -1.0
-    for src in sources[:3]:
+    for src in sources[:4]:
         snippet = _best_evidence_snippet(question, src.content)
-        # Prefer snippets with digits for quantity questions; otherwise keep top hit.
-        score = (3.0 if re.search(r"\d", snippet) else 0.0) + src.similarity
+        score = _intent_score(question, snippet) + src.similarity
         if score > best_score:
             best_score = score
             best_src = src
             best_snippet = snippet
+    return f"{best_snippet} [{best_src.citation_marker}]", used
 
-    lines = [
-        f"{best_snippet} [{best_src.citation_marker}]",
-        "",
-        f"Primary source: {best_src.filename} (similarity {best_src.similarity:.3f})",
-    ]
-    if len(sources) > 1:
-        others_list = [
-            f"[{s.citation_marker}] {s.filename}"
-            for s in sources
-            if s.citation_marker != best_src.citation_marker
-        ][:2]
-        if others_list:
-            lines.append("Also matched: " + ", ".join(others_list))
-    lines.append("")
-    lines.append(
-        "Local demo mode: this is a retrieved evidence summary, not an OpenAI-generated answer. "
-        "Expand Sources below for full passages."
-    )
-    return "\n".join(lines), used
+
+def _intent_score(question: str, sentence: str) -> float:
+    q = question.lower()
+    s = sentence.lower()
+    score = 0.0
+    if re.search(r"\b(leak|leaked|breach|lost|data loss)\b", q):
+        if re.search(r"\b(data loss|incident|report|within 1 hour|security@)\b", s):
+            score += 8.0
+        if re.search(r"\b(must not be stored|personal cloud|personal email)\b", s):
+            score -= 3.0
+    if re.search(r"\b(what happens|what do i do|if)\b", q):
+        if re.search(r"\b(report|notify|within|required|must)\b", s):
+            score += 3.0
+    if re.search(r"\d", sentence):
+        score += 1.5
+    return score
 
 
 def _best_evidence_snippet(question: str, content: str, max_len: int = 280) -> str:
@@ -235,10 +272,10 @@ def _best_evidence_snippet(question: str, content: str, max_len: int = 280) -> s
 
     def score(sentence: str) -> float:
         lower = sentence.lower()
-        # Normalize digits so "0-2" / "0–2" can match "two"/"first" style questions loosely.
         normalized = lower.replace("–", "-").replace("—", "-")
         tokens = set(re.findall(r"[a-z0-9]+", normalized))
         overlap = float(len(q_tokens & tokens))
+        overlap += _intent_score(question, sentence)
         if re.search(r"\d", sentence):
             overlap += 3.0 if wants_number else 1.0
         if any(
@@ -249,14 +286,12 @@ def _best_evidence_snippet(question: str, content: str, max_len: int = 280) -> s
             )
         ):
             overlap += 2.0
-        # Strongly prefer compact rate/rule bullets: "Years 0-2: 15 days..."
         if re.search(r"\byears?\b.+:.+\d+", normalized):
             overlap += 4.0
         if re.search(r"\$\s*\d+|\d+\s*(days|hours|percent|%)", normalized):
             overlap += 2.0
         if ":" in sentence and re.search(r"\d", sentence):
             overlap += 1.5
-        # Long prose eligibility blurbs are weaker than a direct numeric rule.
         if len(sentence) > 140:
             overlap -= 2.0
         if len(sentence) > 220:

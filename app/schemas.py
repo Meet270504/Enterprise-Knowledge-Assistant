@@ -18,6 +18,7 @@ class ConfigResponse(BaseModel):
     app_name: str
     mode: Literal["local_demo", "openai"]
     chat_model: Optional[str]
+    answer_engine: Optional[str] = None
     embedding_provider: str
     embedding_model: str
     chunk_size: int

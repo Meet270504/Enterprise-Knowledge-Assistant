@@ -6,7 +6,8 @@ services:
       POSTGRES_PASSWORD: eka_secret
       POSTGRES_DB: eka
     ports:
-      - "5432:5432"
+      # Bind to localhost only — demo password is not for LAN exposure
+      - "127.0.0.1:5432:5432"
     volumes:
       - eka_pgdata:/var/lib/postgresql/data
     healthcheck:

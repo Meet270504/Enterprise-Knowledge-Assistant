@@ -19,66 +19,78 @@
 
   <div class="shell">
     <aside class="rail" id="rail">
-      <div class="rail-brand">
-        <div class="logo" aria-hidden="true">
-          <span class="logo-core"></span>
-        </div>
-        <div>
-          <p class="logo-word">EKA</p>
-          <p class="logo-tag">Knowledge Assistant</p>
-        </div>
-      </div>
-
-      <button type="button" class="btn new-chat" id="newChatBtn">+ New chat</button>
-
-      <div class="rail-block chats-block">
-        <div class="rail-head">
-          <h2>Chats</h2>
-          <span id="chatCount" class="count">0</span>
-        </div>
-        <ul id="chatList" class="chat-list"></ul>
-        <p id="chatEmpty" class="empty-hint">No chats yet — ask a question to start.</p>
-      </div>
-
-      <div class="rail-block">
-        <div class="rail-head">
-          <h2>Library</h2>
-          <span id="docCount" class="count">0</span>
-        </div>
-        <ul id="docList" class="doc-list"></ul>
-        <p id="docEmpty" class="empty-hint" hidden>No documents indexed yet.</p>
-      </div>
-
-      <div class="rail-block upload-block" id="uploadPanel">
-        <h2>Index a file</h2>
-        <p class="hint">PDF, DOCX, TXT, Markdown, CSV</p>
-        <form id="uploadForm" class="upload-form">
-          <label class="drop" id="dropZone">
-            <input id="fileInput" type="file" accept=".pdf,.docx,.txt,.md,.markdown,.csv" required />
-            <span class="drop-title">Drop or browse</span>
-            <span class="drop-file" id="dropFileName">No file selected</span>
-          </label>
-          <div class="twin">
-            <label>
-              <span>Department</span>
-              <input id="uploadDepartment" type="text" value="General" maxlength="128" />
-            </label>
-            <label>
-              <span>Category</span>
-              <input id="uploadCategory" type="text" value="Policy" maxlength="128" />
-            </label>
+      <div class="rail-top">
+        <div class="rail-brand">
+          <div class="logo" aria-hidden="true">
+            <span class="logo-core"></span>
           </div>
-          <button type="submit" class="btn solid" id="uploadBtn">Upload &amp; index</button>
-          <p id="uploadStatus" class="status" role="status"></p>
-        </form>
-        <p id="uploadDisabled" class="hint" hidden>
-          Public demo: uploads and deletes are locked. Fictional samples only.
-        </p>
+          <div>
+            <p class="logo-word">EKA</p>
+            <p class="logo-tag">Knowledge Assistant</p>
+          </div>
+        </div>
+        <button type="button" class="btn new-chat" id="newChatBtn"><span class="plus">+</span> New chat</button>
       </div>
 
-      <div class="rail-foot">
-        <span id="modeBadge" class="mode-badge" data-mode="local_demo">Local demo</span>
-        <a href="/docs" target="_blank" rel="noopener">API</a>
+      <div class="rail-mid">
+        <div class="rail-tabs" role="tablist" aria-label="Sidebar panels">
+          <button type="button" class="rail-tab is-active" role="tab" id="tabChats" aria-selected="true" aria-controls="panelChats" data-rail-panel="chats">
+            Chats
+            <span id="chatCount" class="count">0</span>
+          </button>
+          <button type="button" class="rail-tab" role="tab" id="tabLibrary" aria-selected="false" aria-controls="panelLibrary" data-rail-panel="library">
+            Library
+            <span id="docCount" class="count">0</span>
+          </button>
+        </div>
+
+        <div class="rail-panel rail-block is-active" role="tabpanel" id="panelChats" aria-labelledby="tabChats">
+          <div class="panel-scroll">
+            <ul id="chatList" class="chat-list"></ul>
+            <p id="chatEmpty" class="empty-hint">No chats yet — ask a question to start.</p>
+          </div>
+        </div>
+
+        <div class="rail-panel rail-block" role="tabpanel" id="panelLibrary" aria-labelledby="tabLibrary" hidden>
+          <div class="panel-scroll">
+            <ul id="docList" class="doc-list"></ul>
+            <p id="docEmpty" class="empty-hint" hidden>No documents indexed yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rail-bottom">
+        <div class="rail-block upload-block" id="uploadPanel">
+          <h2>Index a file</h2>
+          <p class="hint">PDF, DOCX, TXT, Markdown, CSV</p>
+          <form id="uploadForm" class="upload-form">
+            <label class="drop" id="dropZone">
+              <input id="fileInput" type="file" accept=".pdf,.docx,.txt,.md,.markdown,.csv" required />
+              <span class="drop-title">Drop or browse</span>
+              <span class="drop-file" id="dropFileName">No file selected</span>
+            </label>
+            <div class="twin">
+              <label>
+                <span>Department</span>
+                <input id="uploadDepartment" type="text" value="General" maxlength="128" />
+              </label>
+              <label>
+                <span>Category</span>
+                <input id="uploadCategory" type="text" value="Policy" maxlength="128" />
+              </label>
+            </div>
+            <button type="submit" class="btn solid" id="uploadBtn">Upload &amp; index</button>
+            <p id="uploadStatus" class="status" role="status"></p>
+          </form>
+          <p id="uploadDisabled" class="hint" hidden>
+            Public demo: uploads and deletes are locked. Fictional samples only.
+          </p>
+        </div>
+
+        <div class="rail-foot">
+          <span id="modeBadge" class="mode-badge" data-mode="local_demo">Local · phi3:mini</span>
+          <a href="/docs" target="_blank" rel="noopener">API</a>
+        </div>
       </div>
     </aside>
 
@@ -88,8 +100,11 @@
           <span></span><span></span><span></span>
         </button>
         <div class="stage-brand">
-          <h1>Enterprise Knowledge Assistant</h1>
-          <p>Grounded answers from your documents — with visible sources.</p>
+          <div class="stage-brand-row">
+            <h1>Enterprise Knowledge Assistant</h1>
+            <span id="headerMode" class="header-chip" data-mode="local_demo">Local · phi3:mini</span>
+          </div>
+          <p id="headerSub">Grounded answers from your documents — with visible sources.</p>
         </div>
         <div class="filters-inline">
           <select id="departmentFilter" aria-label="Department filter">
@@ -113,12 +128,15 @@
 
       <main class="chat" id="chatMain">
         <section id="emptyState" class="hero">
-          <p class="eyebrow">Ask anything in the knowledge base</p>
+          <div class="hero-kicker">
+            <span class="hero-rule" aria-hidden="true"></span>
+            <p class="eyebrow">Ask anything in the knowledge base</p>
+          </div>
           <h2 class="hero-title">
             Answers that cite<br />what they stand on.
           </h2>
           <p class="hero-copy">
-            Each question opens its own chat so you can review earlier answers anytime from the sidebar.
+            Ask your policies. Get answers tied to real passages — with citations you can verify, not guesses.
           </p>
           <div class="examples" id="examples">
             <button type="button" data-q="How many PTO days do employees accrue in their first two years?">

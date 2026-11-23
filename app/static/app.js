@@ -21,6 +21,10 @@
     docList: $("docList"),
     docCount: $("docCount"),
     docEmpty: $("docEmpty"),
+    tabChats: $("tabChats"),
+    tabLibrary: $("tabLibrary"),
+    panelChats: $("panelChats"),
+    panelLibrary: $("panelLibrary"),
     uploadForm: $("uploadForm"),
     uploadDisabled: $("uploadDisabled"),
     uploadStatus: $("uploadStatus"),
@@ -34,6 +38,8 @@
     rail: $("rail"),
     railToggle: $("railToggle"),
     railBackdrop: $("railBackdrop"),
+    headerMode: $("headerMode"),
+    headerSub: $("headerSub"),
   };
 
   let config = {
@@ -46,6 +52,21 @@
   let chats = [];
   /** @type {string|null} */
   let activeChatId = null;
+  /** @type {"chats"|"library"} */
+  let railPanel = "chats";
+
+  function setRailPanel(panel) {
+    railPanel = panel === "library" ? "library" : "chats";
+    const showLibrary = railPanel === "library";
+    els.tabChats.classList.toggle("is-active", !showLibrary);
+    els.tabLibrary.classList.toggle("is-active", showLibrary);
+    els.tabChats.setAttribute("aria-selected", String(!showLibrary));
+    els.tabLibrary.setAttribute("aria-selected", String(showLibrary));
+    els.panelChats.classList.toggle("is-active", !showLibrary);
+    els.panelLibrary.classList.toggle("is-active", showLibrary);
+    els.panelChats.hidden = showLibrary;
+    els.panelLibrary.hidden = !showLibrary;
+  }
 
   async function api(path, options = {}) {
     const res = await fetch(path, options);
@@ -76,8 +97,17 @@
   }
 
   function titleFromQuestion(question) {
-    const cleaned = question.replace(/\s+/g, " ").trim();
-    return cleaned.length > 42 ? `${cleaned.slice(0, 42)}…` : cleaned;
+    // GPT-style short label: drop filler question words, keep a compact topic.
+    let cleaned = question.replace(/\s+/g, " ").trim().replace(/[?!.]+$/g, "");
+    cleaned = cleaned.replace(
+      /^(how many|how much|what is|what are|what'?s|is there|are there|can you|could you|please|tell me|explain|describe)\s+/i,
+      "",
+    );
+    cleaned = cleaned.replace(/^(the|a|an)\s+/i, "");
+    if (!cleaned) cleaned = question.trim();
+    // Title-case lightly without forcing odd casing on acronyms.
+    const short = cleaned.length > 28 ? `${cleaned.slice(0, 28).trim()}…` : cleaned;
+    return short.charAt(0).toUpperCase() + short.slice(1);
   }
 
   function loadChats() {
@@ -100,15 +130,30 @@
 
   function setModeUI() {
     const demo = config.mode === "local_demo";
-    els.modeBadge.dataset.mode = config.mode;
-    els.modeBadge.textContent = demo
-      ? "Local demo — evidence only"
+    const label = demo
+      ? (config.chat_model ? `Local · ${config.chat_model}` : "Local · extractive")
       : `OpenAI · ${config.chat_model || "chat"}`;
+    els.modeBadge.dataset.mode = config.mode;
+    els.modeBadge.textContent = label;
+    if (els.headerMode) {
+      els.headerMode.dataset.mode = config.mode;
+      els.headerMode.textContent = label;
+    }
     if (config.disclaimer) els.disclaimer.textContent = config.disclaimer;
 
     const uploads = Boolean(config.uploads_enabled);
     els.uploadForm.hidden = !uploads;
     els.uploadDisabled.hidden = uploads;
+  }
+
+  function updateHeaderSub() {
+    if (!els.headerSub) return;
+    const chat = getActiveChat();
+    if (chat?.title) {
+      els.headerSub.textContent = chat.title;
+    } else {
+      els.headerSub.textContent = "Grounded answers from your documents — with visible sources.";
+    }
   }
 
   function statusChip(status) {
@@ -148,14 +193,20 @@
     const ordered = [...chats].sort((a, b) => b.updatedAt - a.updatedAt);
     els.chatCount.textContent = String(ordered.length);
     els.chatEmpty.hidden = ordered.length > 0;
-    els.chatList.innerHTML = ordered.map((chat) => `
-      <li>
-        <button type="button" class="chat-item ${chat.id === activeChatId ? "active" : ""}" data-chat="${chat.id}">
-          <span class="chat-item-title">${escapeHtml(chat.title)}</span>
-          <span class="chat-item-del" data-del-chat="${chat.id}" title="Delete chat">×</span>
+    els.chatList.innerHTML = ordered.map((chat) => {
+      const label = titleFromQuestion(chat.question || chat.title || "Chat");
+      return `
+      <li class="chat-row ${chat.id === activeChatId ? "active" : ""}">
+        <button type="button" class="chat-item" data-chat="${chat.id}" title="${escapeHtml(chat.question || chat.title)}">
+          <span class="chat-item-title">${escapeHtml(label)}</span>
         </button>
-      </li>
-    `).join("");
+        <button type="button" class="chat-item-del" data-del-chat="${chat.id}" aria-label="Delete chat" title="Delete chat">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9zm-1 12h12a1 1 0 0 0 1-1V8H5v12a1 1 0 0 0 1 1z"/>
+          </svg>
+        </button>
+      </li>`;
+    }).join("");
   }
 
   function sourcesHtml(sources) {
@@ -163,13 +214,15 @@
     return `
       <div class="sources-wrap">
         <p class="section-label">Sources</p>
-        <p class="sources-hint">Open a source to read the exact passage used for grounding.</p>
         <div class="sources">
-          ${sources.map((src, idx) => `
-            <details class="source" ${idx === 0 ? "open" : ""}>
+          ${sources.map((src) => `
+            <details class="source receipt">
               <summary>
-                <span><span class="cite">[${escapeHtml(src.citation_marker)}]</span>${escapeHtml(src.filename)}</span>
-                <span class="meta">${escapeHtml(src.department)} · sim ${src.similarity}</span>
+                <span class="receipt-left">
+                  <span class="cite stamp">[${escapeHtml(src.citation_marker)}]</span>
+                  <span class="receipt-file">${escapeHtml(src.filename)}</span>
+                </span>
+                <span class="meta">${src.similarity}</span>
               </summary>
               <div class="body">${escapeHtml(src.content)}</div>
             </details>
@@ -191,39 +244,25 @@
     }
 
     const data = chat.response;
-    const label = data.abstained
-      ? "Result"
-      : data.retrieval_mode === "local_demo"
-        ? "Evidence summary"
-        : "Answer";
 
     els.emptyState.hidden = true;
     els.threadRegion.hidden = false;
     els.threadRegion.innerHTML = `
       <div class="turn">
         <div class="bubble user">${escapeHtml(chat.question)}</div>
-        <div class="bubble assistant">
-          <div class="assistant-head">
-            <span class="pulse-dot" aria-hidden="true"></span>
-            <span class="meta-line">mode · ${escapeHtml(data.retrieval_mode || "")}</span>
-            <span class="meta-line">${
-              data.citations_used?.length
-                ? `citations · ${escapeHtml(data.citations_used.join(", "))}`
-                : "citations · none"
-            }</span>
-          </div>
+        <div class="bubble assistant glass-panel">
           ${data.abstained ? `
             <div class="abstain">
-              Insufficient evidence for a grounded answer with the current filters.
+              Insufficient evidence in the knowledge base for this question.
             </div>` : ""}
-          <p class="section-label">${escapeHtml(label)}</p>
-          <article class="answer-body">${escapeHtml(data.answer || "")}</article>
+          <article class="answer-body pull-quote">${escapeHtml(data.answer || "")}</article>
           ${sourcesHtml(data.sources)}
         </div>
       </div>
     `;
 
     renderChatList();
+    updateHeaderSub();
     els.chatMain.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -237,6 +276,7 @@
     els.threadRegion.innerHTML = "";
     els.emptyState.hidden = false;
     renderChatList();
+    updateHeaderSub();
     if (focusComposer) els.question.focus();
   }
 
@@ -244,6 +284,7 @@
     activeChatId = chatId;
     els.thinking.hidden = true;
     renderActiveChat();
+    updateHeaderSub();
     if (window.innerWidth <= 980) setRail(false);
   }
 
@@ -294,7 +335,13 @@
     }
   });
 
-  els.newChatBtn.addEventListener("click", () => startNewChat());
+  els.newChatBtn.addEventListener("click", () => {
+    setRailPanel("chats");
+    startNewChat();
+  });
+
+  els.tabChats.addEventListener("click", () => setRailPanel("chats"));
+  els.tabLibrary.addEventListener("click", () => setRailPanel("library"));
 
   els.chatList.addEventListener("click", (event) => {
     const del = event.target.closest("[data-del-chat]");
@@ -324,6 +371,7 @@
       question,
       response: null,
     };
+    setRailPanel("chats");
     chats.unshift(chat);
     activeChatId = chat.id;
     saveChats();
@@ -419,6 +467,7 @@
         els.uploadStatus.className = "status ok";
         els.fileInput.value = "";
         els.dropFileName.textContent = "No file selected";
+        setRailPanel("library");
       }
       await loadDocuments();
     } catch (err) {

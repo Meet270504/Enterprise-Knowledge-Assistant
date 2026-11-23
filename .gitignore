@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .cursor/
 .venv/
 venv/
@@ -22,3 +24,15 @@ uploads/
 .idea/
 .vscode/
 data/
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+.npmrc
+.pypirc
+credentials.json
+secrets/
+*.sql
+*.dump
+*.sqlite3

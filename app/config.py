@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     seed_demo_documents: bool = True
     public_demo: bool = False
 
+    # Local LLM for demo mode (no OpenAI key). Uses Ollama when available.
+    local_llm_enabled: bool = True
+    local_llm_base_url: str = "http://127.0.0.1:11434"
+    local_llm_model: str = "phi3:mini"
+
     max_upload_bytes: int = 10 * 1024 * 1024
     chunk_size: int = 800
     chunk_overlap: int = 150
@@ -68,6 +73,12 @@ class Settings(BaseSettings):
     @property
     def mode_label(self) -> Literal["local_demo", "openai"]:
         return "local_demo" if self.effective_demo_mode else "openai"
+
+    @property
+    def display_chat_model(self) -> str | None:
+        if self.effective_demo_mode:
+            return self.local_llm_model if self.local_llm_enabled else None
+        return self.openai_chat_model
 
     @property
     def embedding_provider(self) -> str:

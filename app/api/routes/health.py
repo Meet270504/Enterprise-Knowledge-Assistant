@@ -34,10 +34,21 @@ async def health(db: AsyncSession = Depends(get_db)) -> HealthResponse:
 async def config() -> ConfigResponse:
     settings = get_settings()
     uploads_enabled = not settings.public_demo
+    if settings.effective_demo_mode:
+        answer_engine = (
+            f"local:{settings.local_llm_model}"
+            if settings.local_llm_enabled
+            else "extractive"
+        )
+        chat_model = settings.display_chat_model
+    else:
+        answer_engine = f"openai:{settings.openai_chat_model}"
+        chat_model = settings.openai_chat_model
     return ConfigResponse(
         app_name=settings.app_name,
         mode=settings.mode_label,
-        chat_model=None if settings.effective_demo_mode else settings.openai_chat_model,
+        chat_model=chat_model,
+        answer_engine=answer_engine,
         embedding_provider=settings.embedding_provider,
         embedding_model=settings.embedding_model,
         chunk_size=settings.chunk_size,
