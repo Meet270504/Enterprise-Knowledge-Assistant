@@ -61,6 +61,8 @@ async def config() -> ConfigResponse:
         uploads_enabled=uploads_enabled,
         deletions_enabled=uploads_enabled,
         seed_demo_documents=settings.seed_demo_documents,
+        query_rate_limit_per_ip=settings.query_rate_limit_per_ip,
+        query_daily_global_limit=settings.query_daily_global_limit,
         disclaimer=(
             "Do not rely on AI answers without checking the cited sources. "
             "This portfolio app is single-tenant and is not suitable for confidential "

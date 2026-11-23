@@ -91,6 +91,8 @@ See `.env.example`. Important variables:
 | `SEED_DEMO_DOCUMENTS` | Seed fictional PTO/security/remote/travel/onboarding docs |
 | `PUBLIC_DEMO` | Disable uploads & deletes; fictional docs only |
 | `DATABASE_URL` | Async SQLAlchemy URL (`postgresql+asyncpg://…`) |
+| `QUERY_RATE_LIMIT_PER_IP` | Max `/api/query` calls per IP per hour (`0` = off; default `8`) |
+| `QUERY_DAILY_GLOBAL_LIMIT` | Max queries per UTC day site-wide (`0` = off; default `40`) |
 | `MAX_UPLOAD_BYTES` | Upload size limit (default 10 MB) |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | Chunking |
 | `TOP_K` / `RELEVANCE_THRESHOLD` | Retrieval |
@@ -176,38 +178,62 @@ docker-compose.yml
 
 ---
 
-## Deployment (public Docker host)
+## Deployment (Render + Neon, OpenAI recruiter demo)
 
-This repo is deployment-ready. A live recruiter URL is **not** included until you deploy it.
+Cheap path: **Render** free web (Docker) + **Neon** free Postgres. Recruiters see real **OpenAI** answers; uploads stay locked and query caps limit spend.
 
-### What you need to provide
+### 1. Protect OpenAI spend (do this first)
 
-1. A Docker-capable host with a public HTTPS URL, for example:
-   - [Railway](https://railway.app), [Render](https://render.com), [Fly.io](https://fly.io), or a VPS with Docker
-2. A PostgreSQL database with **pgvector** (Compose `db` service, managed Postgres + extension, or Supabase/Neon with pgvector)
-3. Optional: `OPENAI_API_KEY` for OpenAI mode
-4. For a public anonymous demo: set `PUBLIC_DEMO=true`, `DEMO_MODE=true`, `SEED_DEMO_DOCUMENTS=true`, and **do not** upload real company documents
+1. Open [OpenAI usage limits](https://platform.openai.com/settings/organization/limits)
+2. Set a low **monthly budget / hard limit** (e.g. **$5–10**) and an email alert
+3. Prefer a key used only for this demo
 
-### Suggested public-demo env
+### 2. Neon Postgres + pgvector
+
+1. Create a free project at [neon.tech](https://neon.tech)
+2. Copy the connection string (`postgresql://…`)
+3. Rewrite the scheme to SQLAlchemy async:
+   - `postgresql://` → `postgresql+asyncpg://`
+   - Keep `?ssl=require` (or Neon’s SSL query params)
+4. In the Neon SQL editor (optional check): `CREATE EXTENSION IF NOT EXISTS vector;`  
+   The app also runs this on startup.
+
+### 3. Render web service
+
+1. [Render](https://render.com) → **New** → **Web Service** → connect this GitHub repo
+2. Runtime: **Docker** (uses the repo `Dockerfile`). Free plan is fine; expect a **cold start** after idle
+3. Health check path: `/api/health`
+4. Set environment variables (Blueprint defaults live in `render.yaml`):
 
 ```env
-DEMO_MODE=true
+DEMO_MODE=false
 SEED_DEMO_DOCUMENTS=true
 PUBLIC_DEMO=true
-OPENAI_API_KEY=
-PORT=8000
-DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:5432/DB
+OPENAI_CHAT_MODEL=gpt-4o-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+TOP_K=3
+QUERY_RATE_LIMIT_PER_IP=8
+QUERY_DAILY_GLOBAL_LIMIT=40
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST/DB?ssl=require
+OPENAI_API_KEY=sk-...
 ```
 
-### Deploy outline
+`DEMO_MODE` **must** be `false` and `OPENAI_API_KEY` set, or the UI stays in local demo mode.  
+`PUBLIC_DEMO=true` blocks anonymous uploads/deletes so strangers cannot burn embeddings on large files.
 
-1. Push this repository to GitHub (or your git host)
-2. Create a Postgres/pgvector service and copy its URL into `DATABASE_URL`
-3. Deploy the Dockerfile; ensure `PORT` is provided by the platform
-4. Confirm `CREATE EXTENSION vector` is allowed (the app runs this on startup)
-5. Open the service URL — you should see the UI in **Local demo mode** with sample docs
+### 4. Verify
+
+1. Open the Render URL — badge should show **OpenAI · gpt-4o-mini**, not Local
+2. Library should list the seeded Contoso North sample docs
+3. Ask: `Is MFA required for VPN access?` — expect a cited OpenAI answer
+4. Upload should be disabled
+5. Excess questions return **429** with a demo-budget message (raise `QUERY_*` temporarily on interview day)
 
 Never commit or paste your OpenAI key into the README, screenshots, or client-side code.
+
+### Zero-cost local-demo host (no OpenAI)
+
+If you only want evidence excerpts without a key: `DEMO_MODE=true`, leave `OPENAI_API_KEY` empty, keep `PUBLIC_DEMO=true`.
 
 ---
 
@@ -221,6 +247,9 @@ Never commit or paste your OpenAI key into the README, screenshots, or client-si
 | Demo answers look “non-GPT” | Expected in local demo mode — enable OpenAI mode for model answers |
 | No results after switching modes | Embeddings are isolated; re-seed/re-upload under the active provider/model |
 | Uploads return 403 | `PUBLIC_DEMO=true` disables uploads/deletes |
+| Query returns 429 | Per-IP or daily demo budget hit — wait, or raise `QUERY_RATE_LIMIT_PER_IP` / `QUERY_DAILY_GLOBAL_LIMIT` |
+| Badge still says Local on Render | Set `DEMO_MODE=false` **and** a non-empty `OPENAI_API_KEY` |
+| `type "vector" does not exist` on Neon | Run `CREATE EXTENSION vector` (or use a Neon image/role that allows it) |
 | Port already in use | Set `PORT=8001` (or another free port) |
 
 ---

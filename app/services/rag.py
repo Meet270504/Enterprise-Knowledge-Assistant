@@ -337,6 +337,7 @@ async def _openai_rag_answer(
         api_key=settings.openai_api_key,
         model=settings.openai_chat_model,
         temperature=0,
+        max_tokens=600,
     )
     result = await llm.ainvoke(
         [SystemMessage(content=system), HumanMessage(content=human)]

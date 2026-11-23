@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     relevance_threshold: float = 0.12
     upload_dir: str = "uploads"
 
+    # Public-demo spend guards for /api/query (0 = disabled).
+    # In-memory per process — enough for a single Render web instance.
+    query_rate_limit_per_ip: int = 8
+    query_daily_global_limit: int = 40
+
     # text-embedding-3-small default dimension. Demo hash vectors use the same
     # width so one pgvector column works; isolation is by provider/model labels.
     openai_embedding_dimensions: int = 1536

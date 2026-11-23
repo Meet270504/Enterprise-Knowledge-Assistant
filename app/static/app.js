@@ -74,12 +74,18 @@
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const detail = data.detail;
-      const message = typeof detail === "string"
+      let message = typeof detail === "string"
         ? detail
         : Array.isArray(detail)
           ? detail.map((d) => d.msg || JSON.stringify(d)).join("; ")
           : res.statusText;
-      throw new Error(message || "Request failed");
+      if (res.status === 429) {
+        message = message
+          || "Demo question budget reached. Please wait and try again.";
+      }
+      const err = new Error(message || "Request failed");
+      err.status = res.status;
+      throw err;
     }
     return data;
   }
@@ -139,7 +145,18 @@
       els.headerMode.dataset.mode = config.mode;
       els.headerMode.textContent = label;
     }
-    if (config.disclaimer) els.disclaimer.textContent = config.disclaimer;
+    if (config.disclaimer) {
+      let text = config.disclaimer;
+      const perIp = Number(config.query_rate_limit_per_ip) || 0;
+      const daily = Number(config.query_daily_global_limit) || 0;
+      if (perIp > 0 || daily > 0) {
+        const parts = [];
+        if (perIp > 0) parts.push(`${perIp}/hour per visitor`);
+        if (daily > 0) parts.push(`${daily}/day site-wide`);
+        text += ` Demo question budget: ${parts.join(", ")}.`;
+      }
+      els.disclaimer.textContent = text;
+    }
 
     const uploads = Boolean(config.uploads_enabled);
     els.uploadForm.hidden = !uploads;
@@ -404,12 +421,16 @@
       renderActiveChat();
     } catch (err) {
       if (activeChatId !== chat.id) return;
+      const limited = err.status === 429;
       chat.response = {
-        answer: `Error: ${err.message}`,
-        abstained: false,
+        answer: limited
+          ? err.message
+          : `Error: ${err.message}`,
+        abstained: limited,
         retrieval_mode: config.mode || "local_demo",
         citations_used: [],
         sources: [],
+        message: limited ? "Demo budget limit" : null,
       };
       chat.updatedAt = Date.now();
       saveChats();

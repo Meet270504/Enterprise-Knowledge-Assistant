@@ -31,6 +31,8 @@ class ConfigResponse(BaseModel):
     uploads_enabled: bool
     deletions_enabled: bool
     seed_demo_documents: bool
+    query_rate_limit_per_ip: int = 0
+    query_daily_global_limit: int = 0
     disclaimer: str
 
 

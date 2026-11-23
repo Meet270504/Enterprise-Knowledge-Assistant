@@ -1,10 +1,12 @@
-# Optional Render Blueprint for a public demo.
-# Create a pgvector-enabled Postgres on Render (or external), then:
-#   1. Set DATABASE_URL to the asyncpg URL (postgresql+asyncpg://...)
-#   2. Set DEMO_MODE=true, PUBLIC_DEMO=true, SEED_DEMO_DOCUMENTS=true for recruiter demos
-#   3. Leave OPENAI_API_KEY empty for local demo mode, or set it with DEMO_MODE=false for OpenAI mode
+# Render Blueprint — public recruiter demo with OpenAI answers + spend caps.
 #
-# Never commit real secrets. Configure them in the Render dashboard.
+# 1. Create a Neon (or other) Postgres with pgvector; set DATABASE_URL below
+#    as postgresql+asyncpg://USER:PASSWORD@HOST/DB?ssl=require
+# 2. Set OPENAI_API_KEY in the Render dashboard (sync: false — never commit it)
+# 3. Set a hard monthly budget in the OpenAI billing dashboard ($5–10 recommended)
+# 4. DEMO_MODE=false + key → real OpenAI RAG; PUBLIC_DEMO=true locks uploads
+#
+# Free Render web services sleep when idle (cold start ~30–60s).
 
 services:
   - type: web
@@ -13,11 +15,8 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
-      - key: PORT
-        generateValue: false
-        value: "8000"
       - key: DEMO_MODE
-        value: "true"
+        value: "false"
       - key: SEED_DEMO_DOCUMENTS
         value: "true"
       - key: PUBLIC_DEMO
@@ -26,6 +25,12 @@ services:
         value: "gpt-4o-mini"
       - key: OPENAI_EMBEDDING_MODEL
         value: "text-embedding-3-small"
+      - key: TOP_K
+        value: "3"
+      - key: QUERY_RATE_LIMIT_PER_IP
+        value: "8"
+      - key: QUERY_DAILY_GLOBAL_LIMIT
+        value: "40"
       - key: DATABASE_URL
         sync: false
       - key: OPENAI_API_KEY
